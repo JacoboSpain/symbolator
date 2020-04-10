@@ -18,7 +18,7 @@ import hdlparse.verilog_parser as vlog
 from hdlparse.vhdl_parser import VhdlComponent
 from hdlparse.vhdl_parser import VhdlEntity
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 
 
 def xml_escape(txt):
@@ -110,9 +110,10 @@ class Pin(object):
     return self.padding + w
 
 
+
 class PinSection(object):
   '''Symbol section'''
-  def __init__(self, name, fill=None, line_color=(0,0,0)):
+  def __init__(self, name, fill=None, line_color=(0,0,0),color_group=None):
     self.fill = fill
     self.line_color = line_color
     self.pins = []
@@ -123,6 +124,7 @@ class PinSection(object):
     self.name = name
     self.sect_class = None
 
+        
     if name is not None:
       m = re.match(r'^(\w+)\s*\|(.*)$', name)
       if m:
@@ -131,15 +133,23 @@ class PinSection(object):
         if len(self.name) == 0:
           self.name = None
 
-    class_colors = {
-      'clocks': sinebow.lighten(sinebow.sinebow(0), 0.75),    # Red
-      'data': sinebow.lighten(sinebow.sinebow(0.35), 0.75),   # Green
-      'control': sinebow.lighten(sinebow.sinebow(0.15), 0.75) # Yellow
-    }
-
-    if self.sect_class in class_colors:
-      self.fill = class_colors[self.sect_class]
-
+#    class_colors = {
+#      'clocks': sinebow.lighten(sinebow.sinebow(0), 0.75),    # Red
+#      'data': sinebow.lighten(sinebow.sinebow(0.35), 0.75),   # Green
+#      'control': sinebow.lighten(sinebow.sinebow(0.15), 0.75) # Yellow
+#    }
+        
+    #if self.sect_class in class_colors:
+    #  self.fill = class_colors[self.sect_class]
+    #elif
+    if (color_group is not None) and (self.sect_class is not None):
+      # Si tiene nombre y tenemos grupo asignamos color.
+      if (self.sect_class in color_group):
+         self.fill =  color_group[self.sect_class]
+      else:
+         color_group[self.sect_class] = self.fill
+    
+      
   def add_pin(self, p):
     self.pins.append(p)
 
@@ -288,10 +298,9 @@ class HdlSymbol(object):
       yoff += bb[3] - bb[1] + self.symbol_spacing
 
 
-
-def make_section(sname, sect_pins, fill, extractor, no_type=False):
+def make_section(sname, sect_pins, fill, extractor, no_type=False, color_group = None):
   '''Create a section from a pin list'''
-  sect = PinSection(sname, fill=fill)
+  sect = PinSection(sname, fill=fill,color_group=color_group)
   side = 'l'
 
   for p in sect_pins:
@@ -338,12 +347,20 @@ def make_section(sname, sect_pins, fill, extractor, no_type=False):
 
   return sect
 
+
+class_colors = {
+  'clocks': sinebow.lighten(sinebow.sinebow(0), 0.75),    # Red
+  'data': sinebow.lighten(sinebow.sinebow(0.35), 0.75),   # Green
+  'control': sinebow.lighten(sinebow.sinebow(0.15), 0.75) # Yellow
+}
+    
 def make_symbol(comp, extractor, title=False, no_type=False):
   '''Create a symbol from a parsed component/module'''
   vsym = HdlSymbol() if title == False else HdlSymbol(comp.name)
 
   color_seq = sinebow.distinct_color_sequence(0.6)
-
+  # To associate colors to groups
+  color_group = class_colors 
   if len(comp.generics) > 0: #'generic' in entity_data:
     s = make_section(None, comp.generics, (200,200,200), extractor, no_type)
     s.line_color = (100,100,100)
@@ -366,8 +383,8 @@ def make_symbol(comp, extractor, title=False, no_type=False):
     if len(cur_sect) > 0:
       sections.append((sect_name, cur_sect))
 
-    for sdata in sections:
-      s = make_section(sdata[0], sdata[1], sinebow.lighten(next(color_seq), 0.75), extractor, no_type)
+    for sdata in sections: 
+      s = make_section(sdata[0], sdata[1], sinebow.lighten(next(color_seq), 0.75), extractor, no_type,color_group)
       psym.add_section(s)
 
     vsym.add_symbol(psym)
@@ -524,7 +541,7 @@ def main():
   else:
     print('ERROR: Invalid input source')
     sys.exit(1)
-
+  
   if args.output:
     create_directories(args.output)
 
@@ -566,7 +583,7 @@ def main():
 
       nc.set_surface(surf)
       nc.clear_shapes()
-
+      
       sym = make_symbol(comp, extractor, args.title, args.no_type)
       sym.draw(0,0, nc)
 
